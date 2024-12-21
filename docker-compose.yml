@@ -1,0 +1,79 @@
+
+services: 
+  app:
+    build:
+      args:
+        - UID=${UID:-1000}
+        - GID=${GID:-1000}
+        - USER=${USER:-laravel}
+      context: ./
+      dockerfile: Dockerfile
+    image: shop
+    container_name: shop-app
+    restart: unless-stopped
+    working_dir: /var/www/
+    volumes:
+      - ./:/var/www
+    networks:
+      - shop
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: shop-nginx
+    restart: unless-stopped
+    ports:
+      - 8000:80
+    volumes:
+      - ./:/var/www
+      - ./docker-compose/nginx:/etc/nginx/conf.d
+    depends_on:
+      - mailhog
+    networks:
+      - shop
+
+  php:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+      args:
+        - UID=${UID:-1000}
+        - GID=${GID:-1000}
+        - USER=${USER:-laravel}
+    container_name: php
+    ports:
+      - ":9000"
+    volumes:
+      - ./:/var/www
+      - .env:/var/www/.env
+    networks:
+      - shop
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    logging: 
+      driver: 'none'
+    ports:
+      - 1025:1025
+      - 8025:8025
+    networks:
+      - shop
+
+  postgresql:
+    image: postgres:13
+    container_name: shop-postgresql
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./docker-compose/postgresql:/var/lib/postgresql/data
+    networks:
+      - shop
+
+networks:
+  shop:
+    driver: bridge
